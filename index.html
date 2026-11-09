@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Timetable</title>
+<meta name="theme-color" content="#0f6b63">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f4ef; --surface: #ffffff; --surface-2: #ecebe4; --text: #1d1f1e; --muted: #626865;
+    --line: #dddcd3; --accent: #0f6b63; --accent-text: #ffffff; --today: #e0f0ec;
+    --warn-bg: #fdf1d8; --warn-text: #6d4800; --change-bg: #e4ecff; --change-text: #213f8f;
+    --bad: #a3271c;
+    --c-cancer: #c2410c; --c-crispr: #0f766e; --c-dna: #4338ca; --c-immuno: #a21caf; --c-stem: #4d7c0f; --c-other: #626865;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141615; --surface: #1f2221; --surface-2: #2a2e2c; --text: #eceeec; --muted: #a2a9a5;
+      --line: #333836; --accent: #4cc2b3; --accent-text: #08201d; --today: #1b3531;
+      --warn-bg: #3b2c0d; --warn-text: #f5d48c; --change-bg: #1f2c50; --change-text: #b9ccff;
+      --bad: #ff9c90;
+      --c-cancer: #fb923c; --c-crispr: #2dd4bf; --c-dna: #a5b4fc; --c-immuno: #e879f9; --c-stem: #a3e635; --c-other: #a2a9a5;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 0 16px; }
+  header {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top);
+  }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+  .btn {
+    min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface); font-size: 15px; font-weight: 600;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nav { display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; }
+  .nav .arrow { width: 44px; padding: 0; font-size: 20px; line-height: 1; flex: none; }
+  .range { flex: 1; text-align: center; font-weight: 600; min-width: 0; }
+  .status { font-size: 13px; color: var(--muted); padding-bottom: 10px; text-align: center; min-height: 28px; }
+  .notice { border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 14px; }
+  .notice.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .notice.change {
+    background: var(--change-bg); color: var(--change-text);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600;
+  }
+  .notice.change .btn { flex: none; background: transparent; border-color: currentColor; color: inherit; }
+  section.day { margin-top: 20px; scroll-margin-top: 150px; }
+  .day-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  h2 { font-size: 16px; margin: 0; }
+  .chip {
+    font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    background: var(--accent); color: var(--accent-text); white-space: nowrap;
+  }
+  .chip.change { background: var(--change-bg); color: var(--change-text); }
+  .chip.bad { background: transparent; color: var(--bad); border: 1px solid currentColor; }
+  .empty { color: var(--muted); font-size: 14px; padding: 2px 0; }
+  .day.is-today .card:not(.past) { background: var(--today); }
+  .card {
+    display: grid; grid-template-columns: 62px 1fr; gap: 10px; background: var(--surface);
+    border-radius: 10px; border-left: 5px solid var(--course); padding: 11px 12px; margin-bottom: 8px;
+  }
+  .card.past { opacity: .55; }
+  .card.ghost { background: transparent; outline: 1px dashed var(--line); outline-offset: -1px; }
+  .card.ghost .name, .card.ghost .time { text-decoration: line-through; }
+  .time { font-weight: 700; font-size: 15px; line-height: 1.25; }
+  .time span { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+  .title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .name { font-weight: 700; overflow-wrap: anywhere; }
+  .sub, .meta { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .room { font-size: 15px; font-weight: 600; margin-top: 3px; overflow-wrap: anywhere; }
+  .was { font-size: 14px; font-weight: 600; color: var(--change-text); }
+  .note { font-size: 14px; margin-top: 4px; }
+  a { color: var(--accent); }
+  footer { color: var(--muted); font-size: 13px; padding: 24px 0 calc(32px + env(safe-area-inset-bottom)); }
+  footer a { display: inline-block; padding: 6px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1>My Timetable</h1>
+      <button class="btn primary" id="refresh">Refresh</button>
+    </div>
+    <div class="nav">
+      <button class="btn arrow" id="prev" aria-label="Previous week">&#8249;</button>
+      <div class="range" id="range"></div>
+      <button class="btn" id="thisWeek">Today</button>
+      <button class="btn arrow" id="next" aria-label="Next week">&#8250;</button>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </div>
+</header>
+<main class="wrap">
+  <div id="notices"></div>
+  <div id="days"></div>
+  <footer>
+    Times come straight from the official UniBo timetables:<br>
+    <a href="https://corsi.unibo.it/2cycle/MolecularComputationalBiology/timetable?anno=2&amp;insegnamenti=2026-000-405690--I%7C96043&amp;insegnamenti=2026-000-405689--I%7C96044&amp;insegnamenti=2026-000-379303--I%7C96032&amp;insegnamenti=2026-000-379304--I%7C96033" rel="noopener">Molecular and Computational Biology</a><br>
+    <a href="https://corsi.unibo.it/2cycle/PharmaceuticalBiotechnology/timetable?anno=2&amp;insegnamenti=2026-000-364544--I%7C93272&amp;insegnamenti=2026-000-401136--I%7C90920" rel="noopener">Pharmaceutical Biotechnology</a>
+  </footer>
+</main>
+
+<script>
+'use strict';
+
+/* ---- What to show. Next academic year the codes change: copy them from the official links. ---- */
+const SOURCES = [
+  {
+    id: 'mcb',
+    label: 'Molecular and Computational Biology',
+    courses: 'Cancer Biology, CRISPR-Cas, DNA Regulatory Elements',
+    base: 'https://corsi.unibo.it/2cycle/MolecularComputationalBiology/timetable/@@orario_reale_json',
+    insegnamenti: ['2026-000-405690--I|96043', '2026-000-405689--I|96044', '2026-000-379303--I|96032', '2026-000-379304--I|96033'],
+  },
+  {
+    id: 'pharm',
+    label: 'Pharmaceutical Biotechnology',
+    courses: 'Advanced Immunology, Stem Cells',
+    base: 'https://corsi.unibo.it/2cycle/PharmaceuticalBiotechnology/timetable/@@orario_reale_json',
+    insegnamenti: ['2026-000-364544--I|93272', '2026-000-401136--I|90920'],
+  },
+];
+const COURSES = {
+  '96043': { name: 'Cancer Biology', sub: 'Genetics and Epigenetics of Cancer', color: '--c-cancer' },
+  '96044': { name: 'Cancer Biology', sub: 'Methodologies for Study and Diagnosis', color: '--c-cancer' },
+  '96032': { name: 'CRISPR-Cas Systems', color: '--c-crispr' },
+  '96033': { name: 'DNA Regulatory Elements', color: '--c-dna' },
+  '93272': { name: 'Advanced Immunology', color: '--c-immuno' },
+  '90920': { name: 'Stem Cells and Organoids', color: '--c-stem' },
+};
+const AUTO_REFRESH_MS = 10 * 60 * 1000;
+const REFRESH_ON_RETURN_MS = 60 * 1000;
+const TIMEOUT_MS = 15000;
+const STORE = 'timetable:v1:';
+
+/* ---- Storage: the page must keep working if the browser refuses it. ---- */
+const memoryStore = new Map();
+function readStore(key) {
+  try {
+    const raw = localStorage.getItem(STORE + key);
+    if (raw !== null) return JSON.parse(raw);
+  } catch (e) { /* use memory copy */ }
+  return memoryStore.has(key) ? memoryStore.get(key) : null;
+}
+function writeStore(key, value) {
+  memoryStore.set(key, value);
+  try { localStorage.setItem(STORE + key, JSON.stringify(value)); } catch (e) { /* memory copy is enough */ }
+}
+
+/* ---- Dates (all local time; the feed gives Italian wall-clock times). ---- */
+const pad = n => String(n).padStart(2, '0');
+const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function addDays(d, n) { const c = new Date(d); c.setDate(c.getDate() + n); return c; }
+function mondayOf(d) {
+  const c = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return addDays(c, -((c.getDay() + 6) % 7));
+}
+const clock = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtDay = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+const fmtShort = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+function whenText(ms) {
+  const d = new Date(ms), now = new Date();
+  if (dateKey(d) === dateKey(now)) return `today at ${clock(d)}`;
+  if (dateKey(d) === dateKey(addDays(now, -1))) return `yesterday at ${clock(d)}`;
+  return `${fmtShort.format(d)} at ${clock(d)}`;
+}
+
+/* ---- Lesson helpers ---- */
+const lessonTime = l => l.start.slice(11, 16) + '–' + l.end.slice(11, 16);
+const lessonRoom = l => (l.aule || []).map(a => a.des_risorsa).filter(Boolean).join(', ');
+const sameSlot = (a, b) => a.cod_modulo === b.cod_modulo && a.start === b.start && a.end === b.end && lessonRoom(a) === lessonRoom(b);
+const sameDay = (a, b) => a.cod_modulo === b.cod_modulo && a.start.slice(0, 10) === b.start.slice(0, 10);
+
+/* Compares the lessons you last acknowledged with the current ones. */
+function compare(seen, current) {
+  const left = [...seen], pending = [], changes = new Map();
+  for (const l of current) {
+    const i = left.findIndex(o => sameSlot(o, l));
+    if (i >= 0) left.splice(i, 1); else pending.push(l);
+  }
+  for (const l of pending) {
+    const i = left.findIndex(o => sameDay(o, l));
+    if (i >= 0) changes.set(l, { type: 'changed', was: left.splice(i, 1)[0] });
+    else changes.set(l, { type: 'new' });
+  }
+  return { changes, removed: left };
+}
+
+/* ---- Fetch one official feed for one week. ---- */
+async function fetchOnce(source, monday) {
+  const params = ['anno=2', 'curricula='];
+  for (const code of source.insegnamenti) params.push('insegnamenti=' + encodeURIComponent(code));
+  params.push('start=' + dateKey(monday), 'end=' + dateKey(addDays(monday, 6)));
+  params.push('_=' + Date.now()); // skips the site's own short cache, so a change shows at once
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(source.base + '?' + params.join('&'), { cache: 'no-store', signal: controller.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('unexpected reply');
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function fetchSource(source, monday) {
+  try {
+    return await fetchOnce(source, monday);
+  } catch (e) {
+    await new Promise(r => setTimeout(r, 1200));
+    return fetchOnce(source, monday);
+  }
+}
+
+/* ---- State ---- */
+const state = {
+  monday: mondayOf(new Date()),
+  saved: {},        // source id -> { items, at }
+  failed: [],       // sources that failed in the latest attempt
+  busy: false,
+  attempted: false, // latest load for this week has finished
+  allFresh: false,  // every source answered in the latest load
+  scrollPending: true,
+  lastLoad: 0,
+};
+let loadToken = 0;
+
+const $ = id => document.getElementById(id);
+function el(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+const weekKey = () => dateKey(state.monday);
+const currentLessons = () => SOURCES
+  .flatMap(s => (state.saved[s.id] ? state.saved[s.id].items : []))
+  .sort((a, b) => a.start.localeCompare(b.start));
+
+function openWeek(monday) {
+  state.monday = monday;
+  state.saved = readStore('week:' + dateKey(monday)) || {};
+  state.failed = [];
+  state.attempted = false;
+  state.allFresh = false;
+  state.scrollPending = true;
+  render();
+  load();
+}
+
+async function load() {
+  const token = ++loadToken;
+  const monday = state.monday, key = dateKey(monday);
+  state.busy = true;
+  renderHeader();
+  const results = await Promise.all(SOURCES.map(s =>
+    fetchSource(s, monday).then(items => ({ s, items }), error => ({ s, error }))
+  ));
+  if (token !== loadToken) return;
+
+  const at = Date.now(), saved = readStore('week:' + key) || {}, failed = [];
+  for (const r of results) {
+    if (r.error) failed.push(r.s);
+    else saved[r.s.id] = { items: r.items, at };
+  }
+  writeStore('week:' + key, saved);
+  state.saved = saved;
+  state.failed = failed;
+  state.busy = false;
+  state.attempted = true;
+  state.allFresh = failed.length === 0;
+  state.lastLoad = at;
+  if (state.allFresh && !readStore('seen:' + key)) writeStore('seen:' + key, currentLessons());
+  render();
+}
+
+/* ---- Drawing ---- */
+function renderHeader() {
+  const sunday = addDays(state.monday, 6);
+  $('range').textContent = `${fmtShort.format(state.monday)} – ${fmtShort.format(sunday)}`;
+  $('refresh').disabled = state.busy;
+  $('refresh').textContent = state.busy ? 'Checking…' : 'Refresh';
+  $('thisWeek').disabled = dateKey(state.monday) === dateKey(mondayOf(new Date()));
+  const stamps = SOURCES.map(s => state.saved[s.id] && state.saved[s.id].at).filter(Boolean);
+  let text = '';
+  if (state.busy) text = 'Checking the official timetable…';
+  else if (state.allFresh) text = `Up to date with UniBo · checked ${whenText(state.lastLoad)}`;
+  else if (state.attempted && stamps.length) text = `Oldest data from ${whenText(Math.min(...stamps))}`;
+  $('status').textContent = text;
+}
+
+function renderNotices(changeCount) {
+  const box = $('notices');
+  box.replaceChildren();
+  if (state.attempted && state.failed.length) {
+    const stale = state.failed.filter(s => state.saved[s.id]);
+    const missing = state.failed.filter(s => !state.saved[s.id]);
+    for (const s of stale) {
+      box.append(el('div', 'notice warn',
+        `Couldn't reach UniBo for ${s.courses}. Showing the copy saved ${whenText(state.saved[s.id].at)}, which may be out of date.`));
+    }
+    for (const s of missing) {
+      box.append(el('div', 'notice warn',
+        `Couldn't load ${s.courses}, and there is no saved copy for this week. These lessons are missing below. Check your connection and tap Refresh.`));
+    }
+  }
+  if (changeCount > 0) {
+    const n = el('div', 'notice change');
+    n.append(el('span', '', changeCount === 1 ? '1 change since you last looked' : `${changeCount} changes since you last looked`));
+    const ok = el('button', 'btn', 'Got it');
+    ok.addEventListener('click', () => {
+      writeStore('seen:' + weekKey(), currentLessons());
+      render();
+    });
+    n.append(ok);
+    box.append(n);
+  }
+}
+
+function lessonCard(lesson, opts) {
+  const info = COURSES[lesson.cod_modulo] || { name: lesson.title, color: '--c-other' };
+  const card = el('article', 'card');
+  card.style.setProperty('--course', `var(${info.color})`);
+  const now = new Date(), start = new Date(lesson.start), end = new Date(lesson.end);
+  if (opts.ghost) card.classList.add('ghost');
+  else if (end < now) card.classList.add('past');
+
+  const time = el('div', 'time', lesson.start.slice(11, 16));
+  time.append(el('span', '', lesson.end.slice(11, 16)));
+
+  const body = el('div');
+  const row = el('div', 'title-row');
+  row.append(el('span', 'name', info.name));
+  if (opts.ghost) row.append(el('span', 'chip bad', 'Cancelled or moved'));
+  else if (start <= now && now <= end) row.append(el('span', 'chip', 'Now'));
+  if (opts.change) row.append(el('span', 'chip change', opts.change.type === 'new' ? 'New' : 'Changed'));
+  body.append(row);
+  if (info.sub) body.append(el('div', 'sub', info.sub));
+
+  const rooms = (lesson.aule || []).map(a => {
+    const name = a.des_risorsa ? `Room ${a.des_risorsa}` : '';
+    const elsewhere = a.des_indirizzo && !/beverara/i.test(a.des_indirizzo) ? a.des_indirizzo : '';
+    return [name, a.des_piano, elsewhere].filter(Boolean).join(' · ');
+  }).filter(Boolean).join(' / ');
+  if (rooms) body.append(el('div', 'room', rooms));
+  if (lesson.teledidattica) body.append(el('div', 'room', 'Online'));
+  if (lesson.docente) body.append(el('div', 'meta', lesson.docente));
+
+  if (opts.change && opts.change.type === 'changed') {
+    const was = opts.change.was, parts = [];
+    if (lessonTime(was) !== lessonTime(lesson)) parts.push(lessonTime(was));
+    if (lessonRoom(was) !== lessonRoom(lesson)) parts.push(`Room ${lessonRoom(was) || '?'}`);
+    body.append(el('div', 'was', 'Was: ' + parts.join(', ')));
+  }
+  if (lesson.note) body.append(el('div', 'note', lesson.note));
+  if (typeof lesson.teams === 'string' && /^https:\/\//i.test(lesson.teams)) {
+    const link = el('a', 'note', 'Join on Teams');
+    link.href = lesson.teams;
+    link.rel = 'noopener';
+    link.style.display = 'inline-block';
+    body.append(link);
+  }
+  card.append(time, body);
+  return card;
+}
+
+function render() {
+  renderHeader();
+  const lessons = currentLessons();
+  const seen = readStore('seen:' + weekKey());
+  const diff = state.allFresh && seen ? compare(seen, lessons) : { changes: new Map(), removed: [] };
+  renderNotices(diff.changes.size + diff.removed.length);
+
+  const box = $('days');
+  const haveAny = SOURCES.some(s => state.saved[s.id]);
+  if (!haveAny) {
+    box.replaceChildren(el('p', 'empty', state.attempted ? '' : 'Loading your lessons…'));
+    return;
+  }
+  const incomplete = SOURCES.some(s => !state.saved[s.id]);
+  const todayKey = dateKey(new Date());
+  const frag = document.createDocumentFragment();
+  let todaySection = null;
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(state.monday, i), key = dateKey(date);
+    const entries = [
+      ...lessons.filter(l => l.start.startsWith(key)).map(l => ({ l, opts: { change: diff.changes.get(l) } })),
+      ...diff.removed.filter(l => l.start.startsWith(key)).map(l => ({ l, opts: { ghost: true } })),
+    ].sort((a, b) => a.l.start.localeCompare(b.l.start));
+    if (i >= 5 && !entries.length) continue;
+
+    const section = el('section', 'day');
+    const head = el('div', 'day-head');
+    head.append(el('h2', '', fmtDay.format(date)));
+    if (key === todayKey) {
+      head.append(el('span', 'chip', 'Today'));
+      section.classList.add('is-today');
+      todaySection = section;
+    }
+    section.append(head);
+    if (entries.length) for (const e of entries) section.append(lessonCard(e.l, e.opts));
+    else section.append(el('div', 'empty', incomplete ? 'Nothing here, but some data is missing' : 'No lessons'));
+    frag.append(section);
+  }
+  box.replaceChildren(frag);
+  if (state.scrollPending && state.attempted) {
+    state.scrollPending = false;
+    if (todaySection && todaySection !== box.firstElementChild) todaySection.scrollIntoView();
+    else window.scrollTo(0, 0);
+  }
+}
+
+/* ---- Controls and automatic refresh ---- */
+$('refresh').addEventListener('click', load);
+$('prev').addEventListener('click', () => openWeek(addDays(state.monday, -7)));
+$('next').addEventListener('click', () => openWeek(addDays(state.monday, 7)));
+$('thisWeek').addEventListener('click', () => openWeek(mondayOf(new Date())));
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !state.busy && Date.now() - state.lastLoad > REFRESH_ON_RETURN_MS) load();
+});
+window.addEventListener('online', () => { if (!state.busy) load(); });
+setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  if (!state.busy && Date.now() - state.lastLoad > AUTO_REFRESH_MS) load();
+  else if (!state.busy) render(); // keeps "Now" and past lessons correct
+}, 60000);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+openWeek(state.monday);
+</script>
+</body>
+</html>
